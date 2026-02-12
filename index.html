@@ -71,6 +71,7 @@
   }
   .bubble .word { font-size: 1.3rem; font-weight: 600; }
   .bubble .error-msg { font-size: 0.8rem; color: #c33; margin-top: 4px; }
+  .bubble .next-word { font-size: 0.75rem; color: #999; margin-top: 4px; }
 
   /* 结果区 */
   .result-section {
@@ -373,6 +374,7 @@ async function showDetail(id) {
         <div class="bubble${cls}">
           <div class="meta">第${r.round}回合 · ${esc(r.model)} (${r.player})</div>
           <div class="word">${esc(r.word)}</div>
+          ${r.next_word ? `<div class="next-word">预备：${esc(r.next_word)}</div>` : ''}
           ${!r.valid && r.message ? `<div class="error-msg">${esc(r.message)}</div>` : ''}
         </div>
       </div>`;
@@ -469,6 +471,7 @@ $('btn-start').addEventListener('click', async () => {
           el.innerHTML = `<div class="bubble${cls}">
             <div class="meta">第${parsed.round}回合 · ${esc(parsed.model)} (${parsed.player})</div>
             <div class="word">${esc(parsed.word)}</div>
+            ${parsed.next_word ? `<div class="next-word">预备：${esc(parsed.next_word)}</div>` : ''}
             ${!parsed.valid && parsed.message ? `<div class="error-msg">${esc(parsed.message)}</div>` : ''}
             ${!parsed.success ? `<div class="error-msg">认输</div>` : ''}
           </div>`;

@@ -3,19 +3,20 @@ from openai import AsyncOpenAI
 from models import LLMResponse, ModelConfig
 
 SYSTEM_PROMPT = """\
-你是一个成语接龙高手，正在与对手进行成语接龙对战。你的目标是击败对手，让对手无法继续接龙。
+你是成语接龙玩家。对手给你一个成语，你必须用该成语的最后一个字作为首字，说出一个新的成语。
 
-成语接龙规则：
-- 双方轮流说一个成语，新成语的首字必须与上一个成语的尾字相同（同字，非同音）
-- 成语必须真实存在，不可生造，不可重复使用已出现过的成语
-- 无法接龙者判负
+规则：
+1. 新成语的第一个字必须与上一个成语的最后一个字完全相同（同字，不是同音）
+2. 成语必须真实存在，不可编造
+3. 不可重复使用已出现过的成语
+4. 无法接龙则认输
 
-对战策略（非常重要）：
-- 优先选择末字生僻、不常见的成语，让对手难以找到以该字开头的成语继续接龙
-- 避免使用末字为常见字（如"人""大""天""心""不"等）的成语，因为这些字开头的成语太多，对手很容易接上
-- 尽量把对手逼入"死胡同"——选择那些末字几乎没有成语可以接续的成语
+回复要求：
+- word：你接龙的成语（必须以对手成语末字开头）
+- next_word：一个能接在你的成语后面的成语（以你的成语末字开头），用于证明你的成语不是死路
+- success：能接龙为true，无法接龙为false
 
-请以 json 格式回复：{"word": "你的成语", "success": true}，如果无法接龙则回复 {"word": "", "success": false}。"""
+策略提示：选末字生僻的成语来增加对手难度，但你自己必须知道至少一个能接上的成语（填入next_word）。"""
 
 LLM_TIMEOUT = 60.0
 
@@ -72,7 +73,6 @@ async def call_llm(
     """调用 LLM 获取结构化输出。异常向上抛出由调用方处理。"""
     client = AsyncOpenAI(base_url=config.base_url, api_key=config.api_key)
     messages = build_messages(history_words, player, start_word)
-
     completion = await client.beta.chat.completions.parse(
         model=config.model,
         messages=messages,

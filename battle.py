@@ -30,6 +30,37 @@ def _opponent(player: str) -> str:
     return "B" if player == "A" else "A"
 
 
+def _check_next_word(
+    last_next_word: str,
+    last_valid_player: str,
+    failed_player: str,
+    history_words: list[str],
+    used_words: set[str],
+    default_reason: str,
+) -> tuple[str, str]:
+    """验证回合：当某玩家失败时，检查上一位玩家的 next_word 是否合法。
+
+    合法 → 上一位玩家赢（正常结果）
+    不合法 → 反转！失败方赢（上一位自己也接不上）
+    无 next_word 可验证 → 使用默认判定
+    """
+    if not last_next_word or not last_valid_player:
+        # 第一回合就失败，无 next_word 可验证
+        return _opponent(failed_player), default_reason
+
+    # last_valid_player 的 word 是 history_words[-1]
+    last_word = history_words[-1]
+    next_valid, _ = validate_idiom(last_next_word, last_word, used_words)
+
+    if next_valid:
+        # 上一位有后路，正常判上一位赢
+        return last_valid_player, default_reason
+    else:
+        # 反转！上一位也接不上
+        last_label = _player_label(last_valid_player)
+        return failed_player, f"{last_label}无法证明可以继续接龙"
+
+
 def _sse_event(event: str, data: str) -> dict[str, str]:
     return {"event": event, "data": data}
 
@@ -55,6 +86,10 @@ async def execute_battle(
     reason = ""
     round_num = 0
 
+    # 验证回合：记录上一位有效玩家的 next_word
+    last_next_word: str = ""
+    last_valid_player: str = ""
+
     for round_num in range(1, MAX_ROUNDS + 1):
         config = configs[current_player]
         model_name = config.model
@@ -67,7 +102,6 @@ async def execute_battle(
             )
         except Exception as e:
             logger.exception(f"{label} LLM 调用异常: {e}")
-            winner = _opponent(current_player)
             reason = f"{label}调用失败"
             round_event = RoundEvent(
                 round=round_num,
@@ -81,11 +115,15 @@ async def execute_battle(
             history_records.append(round_event.model_dump())
             if on_round:
                 await on_round(round_event)
+            # 验证回合：检查上一位玩家的 next_word
+            winner, reason = _check_next_word(
+                last_next_word, last_valid_player,
+                current_player, history_words, used_words, reason,
+            )
             break
 
         # 检查认输
         if not response.success:
-            winner = _opponent(current_player)
             reason = f"{label}认输"
             round_event = RoundEvent(
                 round=round_num,
@@ -99,6 +137,11 @@ async def execute_battle(
             history_records.append(round_event.model_dump())
             if on_round:
                 await on_round(round_event)
+            # 验证回合：检查上一位玩家的 next_word
+            winner, reason = _check_next_word(
+                last_next_word, last_valid_player,
+                current_player, history_words, used_words, reason,
+            )
             break
 
         # 验证成语
@@ -110,6 +153,7 @@ async def execute_battle(
             player=current_player,
             model=model_name,
             word=response.word,
+            next_word=response.next_word,
             success=True,
             valid=valid,
             message=message,
@@ -119,16 +163,22 @@ async def execute_battle(
             await on_round(round_event)
 
         if not valid:
-            winner = _opponent(current_player)
             if message == "成语不在词库中":
                 reason = f"{label}成语不在词库中"
             elif message == "首字不匹配":
                 reason = f"{label}首字不匹配"
             elif message == "成语已使用过":
                 reason = f"{label}成语重复使用"
+            # 验证回合：检查上一位玩家的 next_word
+            winner, reason = _check_next_word(
+                last_next_word, last_valid_player,
+                current_player, history_words, used_words, reason,
+            )
             break
 
-        # 有效，记录并切换玩家
+        # 有效，记录 next_word 并切换玩家
+        last_next_word = response.next_word
+        last_valid_player = current_player
         history_words.append(response.word)
         used_words.add(response.word)
         current_player = _opponent(current_player)

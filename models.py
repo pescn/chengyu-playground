@@ -7,6 +7,7 @@ class LLMResponse(BaseModel):
     """LLM 结构化输出 schema，传给 OpenAI SDK response_format。"""
 
     word: str
+    next_word: str = ""
     success: bool
 
 
@@ -33,6 +34,7 @@ class RoundEvent(BaseModel):
     player: str  # "A" or "B"
     model: str
     word: str
+    next_word: str = ""
     success: bool
     valid: bool
     message: str = ""
