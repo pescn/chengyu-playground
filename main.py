@@ -7,8 +7,9 @@ from sse_starlette.sse import EventSourceResponse
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from battle import run_battle
+from benchmark import run_benchmark
 from db_models import Battle
-from models import BattleDetail, BattleListItem, BattleRequest, RoundEvent
+from models import BattleDetail, BattleListItem, BattleRequest, BenchmarkRequest, RoundEvent
 from validator import is_valid_start_word
 
 TORTOISE_ORM = {
@@ -46,6 +47,11 @@ async def battle(request: BattleRequest):
     if not is_valid_start_word(request.start_word):
         raise HTTPException(status_code=400, detail="起始成语不在词库中")
     return EventSourceResponse(run_battle(request))
+
+
+@app.post("/benchmark")
+async def benchmark(request: BenchmarkRequest):
+    return EventSourceResponse(run_benchmark(request))
 
 
 @app.get("/battles", response_model=list[BattleListItem])

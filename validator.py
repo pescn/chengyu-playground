@@ -5,6 +5,11 @@ _CHENGYU_PATH = Path(__file__).parent / "chengyu.json"
 _chengyu_set: set[str] = set(json.loads(_CHENGYU_PATH.read_text(encoding="utf-8")))
 
 
+def get_chengyu_list() -> list[str]:
+    """返回词库中所有成语列表，供随机采样使用。"""
+    return list(_chengyu_set)
+
+
 def validate_existence(word: str) -> bool:
     """检查成语是否在词库中。"""
     return word in _chengyu_set

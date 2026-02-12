@@ -1,14 +1,25 @@
+import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable, Awaitable
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 from db_models import Battle
 from llm import call_llm
-from models import BattleRequest, RoundEvent, ResultEvent
+from models import BattleRequest, RoundEvent, ResultEvent, ModelConfig
 from validator import validate_idiom
 
 MAX_ROUNDS = 30
+
+
+@dataclass
+class BattleResult:
+    winner: str  # "A", "B", "draw"
+    reason: str
+    rounds: int
+    history: list[str]  # 完整历史（含起始成语）
+    battle_id: int
 
 
 def _player_label(player: str) -> str:
@@ -23,11 +34,19 @@ def _sse_event(event: str, data: str) -> dict[str, str]:
     return {"event": event, "data": data}
 
 
-async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], None]:
-    configs = {"A": request.model_a, "B": request.model_b}
-    start_word = request.start_word
+async def execute_battle(
+    model_a: ModelConfig,
+    model_b: ModelConfig,
+    start_word: str,
+    on_round: Callable[[RoundEvent], Awaitable[None]] | None = None,
+) -> BattleResult:
+    """执行完整对战循环，返回 BattleResult。
 
-    history_words: list[str] = []  # 模型输出的成语序列（不含起始成语）
+    可选 on_round 回调在每回合结束后触发，供 SSE 包装器使用。
+    """
+    configs = {"A": model_a, "B": model_b}
+
+    history_words: list[str] = []
     used_words: set[str] = {start_word}
     history_records: list[dict] = []
 
@@ -60,7 +79,8 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
                 message="LLM 调用失败",
             )
             history_records.append(round_event.model_dump())
-            yield _sse_event("round", round_event.model_dump_json())
+            if on_round:
+                await on_round(round_event)
             break
 
         # 检查认输
@@ -77,7 +97,8 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
                 message="",
             )
             history_records.append(round_event.model_dump())
-            yield _sse_event("round", round_event.model_dump_json())
+            if on_round:
+                await on_round(round_event)
             break
 
         # 验证成语
@@ -94,11 +115,11 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
             message=message,
         )
         history_records.append(round_event.model_dump())
-        yield _sse_event("round", round_event.model_dump_json())
+        if on_round:
+            await on_round(round_event)
 
         if not valid:
             winner = _opponent(current_player)
-            # 映射验证错误到具体 reason
             if message == "成语不在词库中":
                 reason = f"{label}成语不在词库中"
             elif message == "首字不匹配":
@@ -112,28 +133,67 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
         used_words.add(response.word)
         current_player = _opponent(current_player)
     else:
-        # 达到最大回合数
         winner = "draw"
         reason = "达到最大回合数"
 
     # 保存到数据库
     battle = await Battle.create(
-        model_a_name=request.model_a.model,
-        model_b_name=request.model_b.model,
+        model_a_name=model_a.model,
+        model_b_name=model_b.model,
         start_word=start_word,
         history=history_records,
         winner=winner,
         reason=reason,
     )
 
-    # 构建完整历史（含起始成语）
     full_history = [start_word] + history_words
 
-    result = ResultEvent(
+    return BattleResult(
         winner=winner,
         reason=reason,
         rounds=round_num,
         history=full_history,
         battle_id=battle.id,
     )
-    yield _sse_event("result", result.model_dump_json())
+
+
+async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], None]:
+    """SSE 包装器：通过 Queue + on_round 回调将 execute_battle 的回合事件流式输出。"""
+    queue: asyncio.Queue[dict[str, str] | None] = asyncio.Queue()
+
+    async def on_round(event: RoundEvent) -> None:
+        await queue.put(_sse_event("round", event.model_dump_json()))
+
+    async def run() -> BattleResult:
+        result = await execute_battle(
+            request.model_a, request.model_b, request.start_word, on_round=on_round
+        )
+        return result
+
+    task = asyncio.create_task(run())
+
+    # 持续从 queue 读取回合事件并 yield
+    while not task.done() or not queue.empty():
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=0.1)
+            if event is not None:
+                yield event
+        except asyncio.TimeoutError:
+            continue
+
+    # task 完成后，排空 queue
+    while not queue.empty():
+        event = queue.get_nowait()
+        if event is not None:
+            yield event
+
+    # yield 最终结果
+    battle_result = task.result()
+    result_event = ResultEvent(
+        winner=battle_result.winner,
+        reason=battle_result.reason,
+        rounds=battle_result.rounds,
+        history=battle_result.history,
+        battle_id=battle_result.battle_id,
+    )
+    yield _sse_event("result", result_event.model_dump_json())

@@ -123,6 +123,87 @@
     cursor: pointer; color: #999;
   }
   .modal .close-btn:hover { color: #333; }
+
+  /* 分割线 */
+  .divider {
+    border: none; border-top: 2px solid #e0e0e0; margin: 32px 0;
+  }
+
+  /* Benchmark 区 */
+  .bench-section {
+    background: #fff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+  }
+  .bench-section h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  .bench-params {
+    display: flex; gap: 12px; align-items: end; margin-top: 12px;
+  }
+  .bench-params .field { flex: 1; }
+  .bench-params .field label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 2px; }
+  .bench-params .field input {
+    width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 0.9rem; outline: none;
+  }
+  .bench-params .field input:focus { border-color: #4a90d9; }
+  #btn-bench {
+    padding: 8px 28px; background: #e67e22; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.95rem; cursor: pointer; white-space: nowrap;
+  }
+  #btn-bench:hover { background: #cf6d17; }
+  #btn-bench:disabled { background: #aaa; cursor: not-allowed; }
+
+  /* 进度条 */
+  .progress-wrap {
+    margin: 16px 0; display: none;
+  }
+  .progress-bar-outer {
+    background: #eee; border-radius: 8px; height: 24px; overflow: hidden; position: relative;
+  }
+  .progress-bar-inner {
+    background: linear-gradient(90deg, #4a90d9, #67b26f); height: 100%; width: 0%;
+    border-radius: 8px; transition: width 0.3s;
+  }
+  .progress-text {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 600; color: #333;
+  }
+
+  /* Benchmark 结果表 */
+  .bench-table {
+    width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.88rem;
+  }
+  .bench-table th, .bench-table td {
+    padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center;
+  }
+  .bench-table th { background: #f8f9fa; font-weight: 600; color: #555; font-size: 0.8rem; }
+  .bench-table td.win-a { color: #2a6faa; font-weight: 600; }
+  .bench-table td.win-b { color: #4a8a2a; font-weight: 600; }
+  .bench-table td.draw-cell { color: #8a7a2a; font-weight: 600; }
+
+  /* 统计卡片 */
+  .bench-summary {
+    display: none; margin-top: 16px;
+  }
+  .summary-cards {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;
+  }
+  .summary-card {
+    background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: center;
+  }
+  .summary-card .num { font-size: 1.8rem; font-weight: 700; }
+  .summary-card .label { font-size: 0.8rem; color: #888; margin-top: 4px; }
+  .summary-card.card-a .num { color: #2a6faa; }
+  .summary-card.card-b .num { color: #4a8a2a; }
+  .summary-card.card-draw .num { color: #8a7a2a; }
+
+  .breakdown-table {
+    width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px;
+  }
+  .breakdown-table th, .breakdown-table td {
+    padding: 6px 10px; border-bottom: 1px solid #eee; text-align: center;
+  }
+  .breakdown-table th { background: #f8f9fa; font-weight: 600; color: #555; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -168,6 +249,61 @@
 
   <!-- 结果区 -->
   <div class="result-section" id="result-section"></div>
+
+  <hr class="divider">
+
+  <!-- Benchmark 配置区 -->
+  <div class="bench-section">
+    <h2>批量测试（Benchmark）</h2>
+    <p style="font-size:0.85rem;color:#888;margin-bottom:8px">随机抽取成语，每个成语交叉测试（A先手 + B先手），统计双方胜率。模型配置复用上方设置。</p>
+    <div class="bench-params">
+      <div class="field">
+        <label>起始成语数量</label>
+        <input id="bench-num" type="number" value="5" min="1" max="50">
+      </div>
+      <div class="field">
+        <label>最大并发数</label>
+        <input id="bench-concurrency" type="number" value="3" min="1" max="10">
+      </div>
+      <button id="btn-bench">开始测试</button>
+    </div>
+  </div>
+
+  <!-- Benchmark 进度区 -->
+  <div class="bench-section progress-wrap" id="bench-progress-section">
+    <h2>测试进度</h2>
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="bench-bar"></div>
+      <div class="progress-text" id="bench-progress-text">0 / 0</div>
+    </div>
+    <table class="bench-table" id="bench-table">
+      <thead>
+        <tr>
+          <th>起始成语</th>
+          <th>先手</th>
+          <th>胜者</th>
+          <th>原因</th>
+          <th>回合数</th>
+          <th>详情</th>
+        </tr>
+      </thead>
+      <tbody id="bench-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Benchmark 统计区 -->
+  <div class="bench-section bench-summary" id="bench-summary">
+    <h2>测试结果</h2>
+    <div class="summary-cards" id="summary-cards"></div>
+    <h3 style="font-size:0.95rem;margin-bottom:4px">先后手胜率交叉表</h3>
+    <table class="breakdown-table">
+      <thead>
+        <tr><th></th><th>先手胜</th><th>后手胜</th><th>平</th></tr>
+      </thead>
+      <tbody id="breakdown-tbody"></tbody>
+    </table>
+    <div id="first-mover-conclusion" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.9rem;"></div>
+  </div>
 
   <!-- 历史区 -->
   <div class="history-section">
@@ -357,6 +493,180 @@ $('btn-start').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+// ========== Benchmark ==========
+$('btn-bench').addEventListener('click', async () => {
+  const btn = $('btn-bench');
+  const progressSection = $('bench-progress-section');
+  const summarySection = $('bench-summary');
+  const bar = $('bench-bar');
+  const progressText = $('bench-progress-text');
+  const tbody = $('bench-tbody');
+
+  // 复用上方模型配置
+  const body = {
+    model_a: { base_url: $('a-url').value.trim(), api_key: $('a-key').value.trim(), model: $('a-model').value.trim() },
+    model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
+    num_words: parseInt($('bench-num').value) || 5,
+    max_concurrency: parseInt($('bench-concurrency').value) || 3,
+  };
+
+  if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||
+      !body.model_b.base_url || !body.model_b.api_key || !body.model_b.model) {
+    alert('请先在上方填写完整的模型配置');
+    return;
+  }
+
+  btn.disabled = true;
+  progressSection.style.display = 'block';
+  summarySection.style.display = 'none';
+  tbody.innerHTML = '';
+  bar.style.width = '0%';
+  progressText.textContent = '0 / 0';
+
+  try {
+    const res = await fetch('/benchmark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || '请求失败');
+      btn.disabled = false;
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        let eventType = 'message';
+        let data = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event:')) eventType = line.slice(6).trim();
+          else if (line.startsWith('data:')) data = line.slice(5).trim();
+        }
+        if (!data) continue;
+        const parsed = JSON.parse(data);
+
+        if (eventType === 'progress') {
+          const pct = Math.round((parsed.completed / parsed.total) * 100);
+          bar.style.width = pct + '%';
+          progressText.textContent = `${parsed.completed} / ${parsed.total}`;
+
+          const r = parsed.current_result;
+          const winCls = r.winner === 'A' ? 'win-a' : r.winner === 'B' ? 'win-b' : 'draw-cell';
+          const winText = r.winner === 'draw' ? '平局' : `模型${r.winner}`;
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${esc(r.start_word)}</td>
+            <td>模型${r.first_player}</td>
+            <td class="${winCls}">${winText}</td>
+            <td>${esc(r.reason)}</td>
+            <td>${r.rounds}</td>
+            <td><a href="javascript:void(0)" onclick="showDetail(${r.battle_id})" style="color:#4a90d9">查看</a></td>
+          `;
+          tbody.appendChild(row);
+        } else if (eventType === 'summary') {
+          renderBenchSummary(parsed);
+          loadHistory();
+        }
+      }
+    }
+  } catch (e) {
+    alert('测试过程中出错: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function renderBenchSummary(s) {
+  const section = $('bench-summary');
+  section.style.display = 'block';
+
+  const aRate = (s.model_a_win_rate * 100).toFixed(1);
+  const bRate = (s.model_b_win_rate * 100).toFixed(1);
+
+  $('summary-cards').innerHTML = `
+    <div class="summary-card card-a">
+      <div class="num">${s.model_a_wins}胜 <span style="font-size:0.9rem">(${aRate}%)</span></div>
+      <div class="label">${esc(s.model_a_name)}</div>
+    </div>
+    <div class="summary-card card-draw">
+      <div class="num">${s.draws}</div>
+      <div class="label">平局</div>
+    </div>
+    <div class="summary-card card-b">
+      <div class="num">${s.model_b_wins}胜 <span style="font-size:0.9rem">(${bRate}%)</span></div>
+      <div class="label">${esc(s.model_b_name)}</div>
+    </div>
+  `;
+
+  // 交叉表：每行是"谁先手"，列是"先手胜 / 后手胜 / 平"
+  const aFirstTotal = s.model_a_first_wins + s.model_a_first_losses + s.model_a_first_draws;
+  const bFirstTotal = s.model_b_first_wins + s.model_b_first_losses + s.model_b_first_draws;
+  const totalAll = aFirstTotal + bFirstTotal;
+
+  // A先手时: 先手胜=A赢, 后手胜=B赢
+  const aFirst_firstWin = s.model_a_first_wins;
+  const aFirst_secondWin = s.model_a_first_losses;
+  const aFirst_draw = s.model_a_first_draws;
+  // B先手时: 先手胜=B赢, 后手胜=A赢
+  const bFirst_firstWin = s.model_b_first_wins;
+  const bFirst_secondWin = s.model_b_first_losses;
+  const bFirst_draw = s.model_b_first_draws;
+  // 汇总
+  const totalFirstWin = aFirst_firstWin + bFirst_firstWin;
+  const totalSecondWin = aFirst_secondWin + bFirst_secondWin;
+  const totalDraw = aFirst_draw + bFirst_draw;
+
+  const pct = (n, t) => t > 0 ? (n / t * 100).toFixed(1) + '%' : '-';
+
+  $('breakdown-tbody').innerHTML = `
+    <tr>
+      <td>${esc(s.model_a_name)} 先手</td>
+      <td>${aFirst_firstWin} <span style="color:#999;font-size:0.8rem">(${pct(aFirst_firstWin, aFirstTotal)})</span></td>
+      <td>${aFirst_secondWin} <span style="color:#999;font-size:0.8rem">(${pct(aFirst_secondWin, aFirstTotal)})</span></td>
+      <td>${aFirst_draw}</td>
+    </tr>
+    <tr>
+      <td>${esc(s.model_b_name)} 先手</td>
+      <td>${bFirst_firstWin} <span style="color:#999;font-size:0.8rem">(${pct(bFirst_firstWin, bFirstTotal)})</span></td>
+      <td>${bFirst_secondWin} <span style="color:#999;font-size:0.8rem">(${pct(bFirst_secondWin, bFirstTotal)})</span></td>
+      <td>${bFirst_draw}</td>
+    </tr>
+    <tr style="font-weight:700;border-top:2px solid #ccc">
+      <td>总计</td>
+      <td>${totalFirstWin} <span style="color:#999;font-size:0.8rem">(${pct(totalFirstWin, totalAll)})</span></td>
+      <td>${totalSecondWin} <span style="color:#999;font-size:0.8rem">(${pct(totalSecondWin, totalAll)})</span></td>
+      <td>${totalDraw}</td>
+    </tr>
+  `;
+
+  // 结论
+  const conc = $('first-mover-conclusion');
+  if (totalFirstWin > totalSecondWin) {
+    conc.style.background = '#e8f4fd';
+    conc.innerHTML = `<strong>结论：先手优势明显</strong> — 先手胜率 ${pct(totalFirstWin, totalAll)}，后手胜率 ${pct(totalSecondWin, totalAll)}`;
+  } else if (totalSecondWin > totalFirstWin) {
+    conc.style.background = '#f0f8e8';
+    conc.innerHTML = `<strong>结论：后手优势明显</strong> — 后手胜率 ${pct(totalSecondWin, totalAll)}，先手胜率 ${pct(totalFirstWin, totalAll)}`;
+  } else {
+    conc.style.background = '#f5f0e0';
+    conc.innerHTML = `<strong>结论：先后手无明显差异</strong> — 先手胜率 ${pct(totalFirstWin, totalAll)}，后手胜率 ${pct(totalSecondWin, totalAll)}`;
+  }
+}
 
 // 初始加载
 loadHistory();
