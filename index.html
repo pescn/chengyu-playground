@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成语接龙 LLM 对战平台</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa; color: #333; line-height: 1.6;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+  h1 { text-align: center; margin-bottom: 24px; font-size: 1.6rem; }
+
+  /* 配置区 */
+  .config-section {
+    background: #fff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+  }
+  .config-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .config-group h3 { margin-bottom: 8px; font-size: 0.95rem; color: #555; }
+  .config-group label { display: block; font-size: 0.8rem; color: #888; margin: 6px 0 2px; }
+  .config-group input {
+    width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+  }
+  .config-group input:focus { border-color: #4a90d9; }
+  .start-row {
+    display: flex; gap: 12px; align-items: end; margin-top: 16px;
+  }
+  .start-row .field { flex: 1; }
+  .start-row label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 2px; }
+  .start-row input {
+    width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 0.9rem; outline: none;
+  }
+  #btn-start {
+    padding: 8px 28px; background: #4a90d9; color: #fff; border: none;
+    border-radius: 6px; font-size: 0.95rem; cursor: pointer; white-space: nowrap;
+  }
+  #btn-start:hover { background: #3a7bc8; }
+  #btn-start:disabled { background: #aaa; cursor: not-allowed; }
+
+  /* 对战区 */
+  .battle-section {
+    background: #fff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+    min-height: 120px; display: none;
+  }
+  .battle-section h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  .battle-area {
+    max-height: 500px; overflow-y: auto; padding: 8px 0;
+  }
+  .round-item {
+    display: flex; margin-bottom: 10px; align-items: flex-start;
+  }
+  .round-item.player-a { justify-content: flex-start; }
+  .round-item.player-b { justify-content: flex-end; }
+  .bubble {
+    max-width: 70%; padding: 10px 14px; border-radius: 12px;
+    position: relative; font-size: 0.95rem;
+  }
+  .player-a .bubble { background: #e8f4fd; border-bottom-left-radius: 4px; }
+  .player-b .bubble { background: #f0f8e8; border-bottom-right-radius: 4px; }
+  .bubble.invalid { background: #fde8e8; border: 1px solid #e88; }
+  .bubble .meta {
+    font-size: 0.75rem; color: #999; margin-bottom: 4px;
+  }
+  .bubble .word { font-size: 1.3rem; font-weight: 600; }
+  .bubble .error-msg { font-size: 0.8rem; color: #c33; margin-top: 4px; }
+
+  /* 结果区 */
+  .result-section {
+    background: #fff; border-radius: 12px; padding: 20px; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+    display: none;
+  }
+  .result-section .winner { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+  .result-section .detail { font-size: 0.9rem; color: #666; }
+
+  /* 历史区 */
+  .history-section {
+    background: #fff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .history-section h2 { font-size: 1.1rem; margin-bottom: 12px; }
+  .history-list { list-style: none; }
+  .history-list li {
+    padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: background 0.15s;
+  }
+  .history-list li:hover { background: #f8f9fa; }
+  .history-list li:last-child { border-bottom: none; }
+  .history-list .info { font-size: 0.9rem; }
+  .history-list .info .models { font-weight: 500; }
+  .history-list .result-tag {
+    font-size: 0.8rem; padding: 2px 8px; border-radius: 4px;
+    font-weight: 500;
+  }
+  .result-tag.winner-a { background: #e8f4fd; color: #2a6faa; }
+  .result-tag.winner-b { background: #f0f8e8; color: #4a8a2a; }
+  .result-tag.draw { background: #f5f0e0; color: #8a7a2a; }
+  .empty-msg { color: #aaa; font-size: 0.9rem; text-align: center; padding: 20px; }
+
+  /* 详情弹窗 */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4); display: none; justify-content: center;
+    align-items: center; z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 24px;
+    max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
+  }
+  .modal h3 { margin-bottom: 12px; }
+  .modal .close-btn {
+    float: right; background: none; border: none; font-size: 1.3rem;
+    cursor: pointer; color: #999;
+  }
+  .modal .close-btn:hover { color: #333; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>成语接龙 LLM 对战平台</h1>
+
+  <!-- 配置区 -->
+  <div class="config-section">
+    <div class="config-grid">
+      <div class="config-group">
+        <h3>模型 A</h3>
+        <label>Base URL</label>
+        <input id="a-url" type="text" placeholder="https://api.example.com/v1">
+        <label>API Key</label>
+        <input id="a-key" type="password" placeholder="sk-xxx">
+        <label>模型名称</label>
+        <input id="a-model" type="text" placeholder="gpt-4o">
+      </div>
+      <div class="config-group">
+        <h3>模型 B</h3>
+        <label>Base URL</label>
+        <input id="b-url" type="text" placeholder="https://api.example.com/v1">
+        <label>API Key</label>
+        <input id="b-key" type="password" placeholder="sk-xxx">
+        <label>模型名称</label>
+        <input id="b-model" type="text" placeholder="claude-sonnet-4-20250514">
+      </div>
+    </div>
+    <div class="start-row">
+      <div class="field">
+        <label>起始成语</label>
+        <input id="start-word" type="text" placeholder="一心一意">
+      </div>
+      <button id="btn-start">开始对战</button>
+    </div>
+  </div>
+
+  <!-- 对战区 -->
+  <div class="battle-section" id="battle-section">
+    <h2>对战进行中...</h2>
+    <div class="battle-area" id="battle-area"></div>
+  </div>
+
+  <!-- 结果区 -->
+  <div class="result-section" id="result-section"></div>
+
+  <!-- 历史区 -->
+  <div class="history-section">
+    <h2>历史对战</h2>
+    <ul class="history-list" id="history-list"></ul>
+  </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// 加载历史记录
+async function loadHistory() {
+  const list = $('history-list');
+  try {
+    const res = await fetch('/battles');
+    const data = await res.json();
+    if (!data.length) {
+      list.innerHTML = '<li class="empty-msg">暂无对战记录</li>';
+      return;
+    }
+    list.innerHTML = data.map(b => {
+      const tagClass = b.winner === 'draw' ? 'draw' : b.winner === 'A' ? 'winner-a' : 'winner-b';
+      const tagText = b.winner === 'draw' ? '平局' : `模型${b.winner}胜`;
+      const time = new Date(b.created_at).toLocaleString('zh-CN');
+      return `<li onclick="showDetail(${b.id})">
+        <span class="info">
+          <span class="models">${esc(b.model_a_name)} vs ${esc(b.model_b_name)}</span>
+          &nbsp;·&nbsp;${esc(b.start_word)}&nbsp;·&nbsp;<span style="color:#aaa">${time}</span>
+        </span>
+        <span class="result-tag ${tagClass}">${tagText} — ${esc(b.reason)}</span>
+      </li>`;
+    }).join('');
+  } catch {
+    list.innerHTML = '<li class="empty-msg">加载失败</li>';
+  }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// 显示详情
+async function showDetail(id) {
+  const overlay = $('modal-overlay');
+  const content = $('modal-content');
+  try {
+    const res = await fetch(`/battles/${id}`);
+    if (!res.ok) throw new Error();
+    const b = await res.json();
+    const winText = b.winner === 'draw' ? '平局' : `模型${b.winner}胜`;
+    let html = `<button class="close-btn" onclick="closeModal()">&times;</button>`;
+    html += `<h3>${esc(b.model_a_name)} vs ${esc(b.model_b_name)}</h3>`;
+    html += `<p style="color:#666;margin-bottom:12px">起始：${esc(b.start_word)} · ${winText} · ${esc(b.reason)}</p>`;
+    html += `<div>`;
+    for (const r of b.history) {
+      const side = r.player === 'A' ? 'player-a' : 'player-b';
+      const cls = r.valid ? '' : ' invalid';
+      html += `<div class="round-item ${side}">
+        <div class="bubble${cls}">
+          <div class="meta">第${r.round}回合 · ${esc(r.model)} (${r.player})</div>
+          <div class="word">${esc(r.word)}</div>
+          ${!r.valid && r.message ? `<div class="error-msg">${esc(r.message)}</div>` : ''}
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+    content.innerHTML = html;
+    overlay.classList.add('active');
+  } catch {
+    alert('加载详情失败');
+  }
+}
+
+function closeModal() {
+  $('modal-overlay').classList.remove('active');
+}
+$('modal-overlay').addEventListener('click', e => {
+  if (e.target === $('modal-overlay')) closeModal();
+});
+
+// 开始对战
+$('btn-start').addEventListener('click', async () => {
+  const btn = $('btn-start');
+  const battleSection = $('battle-section');
+  const battleArea = $('battle-area');
+  const resultSection = $('result-section');
+
+  // 收集配置
+  const body = {
+    model_a: { base_url: $('a-url').value.trim(), api_key: $('a-key').value.trim(), model: $('a-model').value.trim() },
+    model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
+    start_word: $('start-word').value.trim()
+  };
+
+  if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||
+      !body.model_b.base_url || !body.model_b.api_key || !body.model_b.model ||
+      !body.start_word) {
+    alert('请填写完整配置');
+    return;
+  }
+
+  btn.disabled = true;
+  battleSection.style.display = 'block';
+  battleSection.querySelector('h2').textContent = '对战进行中...';
+  battleArea.innerHTML = '';
+  resultSection.style.display = 'none';
+
+  // 添加起始成语
+  battleArea.innerHTML = `<div style="text-align:center;color:#888;margin:8px 0;font-size:0.9rem">起始成语：<strong>${esc(body.start_word)}</strong></div>`;
+
+  try {
+    const res = await fetch('/battle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || '请求失败');
+      btn.disabled = false;
+      return;
+    }
+
+    // 手动解析 SSE（POST 不能用 EventSource）
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+      // 按双换行分割 SSE 事件
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop(); // 保留不完整部分
+
+      for (const part of parts) {
+        let eventType = 'message';
+        let data = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event:')) eventType = line.slice(6).trim();
+          else if (line.startsWith('data:')) data = line.slice(5).trim();
+        }
+        if (!data) continue;
+
+        const parsed = JSON.parse(data);
+
+        if (eventType === 'round') {
+          const side = parsed.player === 'A' ? 'player-a' : 'player-b';
+          const cls = parsed.valid ? '' : ' invalid';
+          const el = document.createElement('div');
+          el.className = `round-item ${side}`;
+          el.innerHTML = `<div class="bubble${cls}">
+            <div class="meta">第${parsed.round}回合 · ${esc(parsed.model)} (${parsed.player})</div>
+            <div class="word">${esc(parsed.word)}</div>
+            ${!parsed.valid && parsed.message ? `<div class="error-msg">${esc(parsed.message)}</div>` : ''}
+            ${!parsed.success ? `<div class="error-msg">认输</div>` : ''}
+          </div>`;
+          battleArea.appendChild(el);
+          battleArea.scrollTop = battleArea.scrollHeight;
+        } else if (eventType === 'result') {
+          battleSection.querySelector('h2').textContent = '对战结束';
+          const winText = parsed.winner === 'draw' ? '平局！' :
+            `模型${parsed.winner}获胜！`;
+          resultSection.style.display = 'block';
+          resultSection.innerHTML = `
+            <div class="winner">${winText}</div>
+            <div class="detail">${esc(parsed.reason)} · 共 ${parsed.rounds} 回合</div>
+          `;
+          loadHistory();
+        }
+      }
+    }
+  } catch (e) {
+    alert('对战过程中出错: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// 初始加载
+loadHistory();
+</script>
+</body>
+</html>

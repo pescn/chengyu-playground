@@ -1,0 +1,15 @@
+[project]
+name = "chengyu-playground"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.129.0",
+    "openai>=2.20.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.0.0",
+    "sse-starlette>=2.0.0",
+    "tortoise-orm>=0.22.0",
+    "aiosqlite>=0.20.0",
+]
