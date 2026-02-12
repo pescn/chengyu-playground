@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,8 +13,10 @@ from db_models import Battle
 from models import BattleDetail, BattleListItem, BattleRequest, BenchmarkRequest, RoundEvent
 from validator import is_valid_start_word
 
+DB_PATH = os.environ.get("DB_PATH", "battles.db")
+
 TORTOISE_ORM = {
-    "connections": {"default": "sqlite://battles.db"},
+    "connections": {"default": f"sqlite://{DB_PATH}"},
     "apps": {
         "models": {
             "models": ["db_models"],

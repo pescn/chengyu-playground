@@ -1,0 +1,11 @@
+services:
+  chengyu:
+    image: ghcr.io/OWNER/chengyu-playground:latest  # 替换 OWNER 为你的 GitHub 用户名
+    ports:
+      - "8000:8000"
+    volumes:
+      - chengyu-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  chengyu-data:
