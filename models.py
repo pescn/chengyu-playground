@@ -25,6 +25,7 @@ class BattleRequest(BaseModel):
     model_a: ModelConfig
     model_b: ModelConfig
     start_word: str
+    system_prompt: str = ""
 
 
 class RoundEvent(BaseModel):
@@ -78,6 +79,7 @@ class BenchmarkRequest(BaseModel):
     model_b: ModelConfig
     num_words: int = Field(default=5, ge=1, le=50)
     max_concurrency: int = Field(default=3, ge=1, le=10)
+    system_prompt: str = ""
 
 
 class BenchmarkBattleResult(BaseModel):

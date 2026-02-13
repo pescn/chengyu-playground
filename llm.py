@@ -2,7 +2,7 @@ from openai import AsyncOpenAI
 
 from models import LLMResponse, ModelConfig
 
-SYSTEM_PROMPT = """\
+DEFAULT_SYSTEM_PROMPT = """\
 你是成语接龙玩家。对手给你一个成语，你必须用该成语的最后一个字作为首字，说出一个新的成语。
 
 规则：
@@ -22,7 +22,10 @@ LLM_TIMEOUT = 60.0
 
 
 def build_messages(
-    history_words: list[str], player: str, start_word: str
+    history_words: list[str],
+    player: str,
+    start_word: str,
+    system_prompt: str = "",
 ) -> list[dict[str, str]]:
     """构建当前模型视角的 messages 列表。
 
@@ -34,11 +37,13 @@ def build_messages(
       注意：B 视角下 start_word 与 A 的第一步会连续两个 user，
       因此对 B 跳过 start_word，直接从 A 的第一步作为首条 user 消息。
     """
+    prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
+
     if player == "A":
-        system_content = SYSTEM_PROMPT
+        system_content = prompt
     else:
         # B 视角：将起始成语补充到 system prompt，避免丢失上下文
-        system_content = f"{SYSTEM_PROMPT}\n\n本局起始成语为「{start_word}」。"
+        system_content = f"{prompt}\n\n本局起始成语为「{start_word}」。"
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system_content},
@@ -69,10 +74,11 @@ async def call_llm(
     history_words: list[str],
     player: str,
     start_word: str,
+    system_prompt: str = "",
 ) -> LLMResponse:
     """调用 LLM 获取结构化输出。异常向上抛出由调用方处理。"""
     client = AsyncOpenAI(base_url=config.base_url, api_key=config.api_key)
-    messages = build_messages(history_words, player, start_word)
+    messages = build_messages(history_words, player, start_word, system_prompt)
     completion = await client.beta.chat.completions.parse(
         model=config.model,
         messages=messages,

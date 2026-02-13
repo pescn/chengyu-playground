@@ -9,6 +9,7 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from battle import run_battle
 from benchmark import run_benchmark
+from llm import DEFAULT_SYSTEM_PROMPT
 from db_models import Battle
 from models import BattleDetail, BattleListItem, BattleRequest, BenchmarkRequest, RoundEvent
 from validator import is_valid_start_word
@@ -43,6 +44,11 @@ app = FastAPI(title="成语接龙 LLM 对战平台", lifespan=lifespan)
 async def index():
     html_path = Path(__file__).parent / "index.html"
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/default-system-prompt")
+async def get_default_system_prompt():
+    return {"system_prompt": DEFAULT_SYSTEM_PROMPT}
 
 
 @app.post("/battle")

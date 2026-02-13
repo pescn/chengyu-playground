@@ -70,6 +70,7 @@ async def execute_battle(
     model_b: ModelConfig,
     start_word: str,
     on_round: Callable[[RoundEvent], Awaitable[None]] | None = None,
+    system_prompt: str = "",
 ) -> BattleResult:
     """执行完整对战循环，返回 BattleResult。
 
@@ -98,7 +99,7 @@ async def execute_battle(
         # 调用 LLM
         try:
             response = await call_llm(
-                config, history_words, current_player, start_word
+                config, history_words, current_player, start_word, system_prompt
             )
         except Exception as e:
             logger.exception(f"{label} LLM 调用异常: {e}")
@@ -216,7 +217,8 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
 
     async def run() -> BattleResult:
         result = await execute_battle(
-            request.model_a, request.model_b, request.start_word, on_round=on_round
+            request.model_a, request.model_b, request.start_word,
+            on_round=on_round, system_prompt=request.system_prompt,
         )
         return result
 

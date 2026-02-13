@@ -44,6 +44,30 @@
   #btn-start:hover { background: #3a7bc8; }
   #btn-start:disabled { background: #aaa; cursor: not-allowed; }
 
+  /* System Prompt 折叠区 */
+  .prompt-section { margin-top: 16px; }
+  .prompt-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none; color: #4a90d9; font-size: 0.88rem;
+    cursor: pointer; padding: 0;
+  }
+  .prompt-toggle:hover { text-decoration: underline; }
+  .prompt-toggle .arrow { transition: transform 0.2s; display: inline-block; }
+  .prompt-toggle .arrow.open { transform: rotate(90deg); }
+  .prompt-body { display: none; margin-top: 8px; }
+  .prompt-body.open { display: block; }
+  .prompt-body textarea {
+    width: 100%; min-height: 180px; padding: 10px; border: 1px solid #ddd;
+    border-radius: 6px; font-size: 0.88rem; line-height: 1.5; resize: vertical;
+    font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  .prompt-body textarea:focus { border-color: #4a90d9; }
+  .prompt-reset {
+    margin-top: 6px; background: none; border: 1px solid #ddd; color: #888;
+    padding: 4px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;
+  }
+  .prompt-reset:hover { border-color: #999; color: #555; }
+
   /* 对战区 */
   .battle-section {
     background: #fff; border-radius: 12px; padding: 20px;
@@ -240,6 +264,16 @@
       </div>
       <button id="btn-start">开始对战</button>
     </div>
+    <div class="prompt-section">
+      <button class="prompt-toggle" id="prompt-toggle" type="button">
+        <span class="arrow" id="prompt-arrow">&#9654;</span>
+        系统提示词配置
+      </button>
+      <div class="prompt-body" id="prompt-body">
+        <textarea id="system-prompt" placeholder="加载中..."></textarea>
+        <button class="prompt-reset" id="prompt-reset" type="button">恢复默认</button>
+      </div>
+    </div>
   </div>
 
   <!-- 对战区 -->
@@ -320,6 +354,33 @@
 
 <script>
 const $ = id => document.getElementById(id);
+
+// ========== System Prompt ==========
+let defaultSystemPrompt = '';
+
+async function loadDefaultPrompt() {
+  try {
+    const res = await fetch('/default-system-prompt');
+    const data = await res.json();
+    defaultSystemPrompt = data.system_prompt;
+    $('system-prompt').value = defaultSystemPrompt;
+  } catch {
+    $('system-prompt').placeholder = '加载默认提示词失败';
+  }
+}
+
+$('prompt-toggle').addEventListener('click', () => {
+  const body = $('prompt-body');
+  const arrow = $('prompt-arrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+$('prompt-reset').addEventListener('click', () => {
+  $('system-prompt').value = defaultSystemPrompt;
+});
+
+loadDefaultPrompt();
 
 // 加载历史记录
 async function loadHistory() {
@@ -402,10 +463,12 @@ $('btn-start').addEventListener('click', async () => {
   const resultSection = $('result-section');
 
   // 收集配置
+  const systemPrompt = $('system-prompt').value.trim();
   const body = {
     model_a: { base_url: $('a-url').value.trim(), api_key: $('a-key').value.trim(), model: $('a-model').value.trim() },
     model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
-    start_word: $('start-word').value.trim()
+    start_word: $('start-word').value.trim(),
+    system_prompt: systemPrompt
   };
 
   if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||
@@ -507,11 +570,13 @@ $('btn-bench').addEventListener('click', async () => {
   const tbody = $('bench-tbody');
 
   // 复用上方模型配置
+  const benchSystemPrompt = $('system-prompt').value.trim();
   const body = {
     model_a: { base_url: $('a-url').value.trim(), api_key: $('a-key').value.trim(), model: $('a-model').value.trim() },
     model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
     num_words: parseInt($('bench-num').value) || 5,
     max_concurrency: parseInt($('bench-concurrency').value) || 3,
+    system_prompt: benchSystemPrompt
   };
 
   if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||
