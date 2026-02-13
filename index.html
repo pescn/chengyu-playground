@@ -33,9 +33,9 @@
   }
   .start-row .field { flex: 1; }
   .start-row label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 2px; }
-  .start-row input {
+  .start-row input, .start-row select {
     width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
-    font-size: 0.9rem; outline: none;
+    font-size: 0.9rem; outline: none; background: #fff;
   }
   #btn-start {
     padding: 8px 28px; background: #4a90d9; color: #fff; border: none;
@@ -262,6 +262,14 @@
         <label>起始成语</label>
         <input id="start-word" type="text" placeholder="一心一意">
       </div>
+      <div class="field">
+        <label>验证模式</label>
+        <select id="validation-mode">
+          <option value="same_char">同字（默认）</option>
+          <option value="homophone">同音即可</option>
+          <option value="same_char_sound">同字同音</option>
+        </select>
+      </div>
       <button id="btn-start">开始对战</button>
     </div>
     <div class="prompt-section">
@@ -468,7 +476,8 @@ $('btn-start').addEventListener('click', async () => {
     model_a: { base_url: $('a-url').value.trim(), api_key: $('a-key').value.trim(), model: $('a-model').value.trim() },
     model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
     start_word: $('start-word').value.trim(),
-    system_prompt: systemPrompt
+    system_prompt: systemPrompt,
+    validation_mode: $('validation-mode').value
   };
 
   if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||
@@ -576,7 +585,8 @@ $('btn-bench').addEventListener('click', async () => {
     model_b: { base_url: $('b-url').value.trim(), api_key: $('b-key').value.trim(), model: $('b-model').value.trim() },
     num_words: parseInt($('bench-num').value) || 5,
     max_concurrency: parseInt($('bench-concurrency').value) || 3,
-    system_prompt: benchSystemPrompt
+    system_prompt: benchSystemPrompt,
+    validation_mode: $('validation-mode').value
   };
 
   if (!body.model_a.base_url || !body.model_a.api_key || !body.model_a.model ||

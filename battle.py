@@ -37,6 +37,7 @@ def _check_next_word(
     history_words: list[str],
     used_words: set[str],
     default_reason: str,
+    validation_mode: str = "same_char",
 ) -> tuple[str, str]:
     """验证回合：当某玩家失败时，检查上一位玩家的 next_word 是否合法。
 
@@ -50,7 +51,7 @@ def _check_next_word(
 
     # last_valid_player 的 word 是 history_words[-1]
     last_word = history_words[-1]
-    next_valid, _ = validate_idiom(last_next_word, last_word, used_words)
+    next_valid, _ = validate_idiom(last_next_word, last_word, used_words, validation_mode)
 
     if next_valid:
         # 上一位有后路，正常判上一位赢
@@ -71,6 +72,7 @@ async def execute_battle(
     start_word: str,
     on_round: Callable[[RoundEvent], Awaitable[None]] | None = None,
     system_prompt: str = "",
+    validation_mode: str = "same_char",
 ) -> BattleResult:
     """执行完整对战循环，返回 BattleResult。
 
@@ -99,7 +101,8 @@ async def execute_battle(
         # 调用 LLM
         try:
             response = await call_llm(
-                config, history_words, current_player, start_word, system_prompt
+                config, history_words, current_player, start_word, system_prompt,
+                validation_mode,
             )
         except Exception as e:
             logger.exception(f"{label} LLM 调用异常: {e}")
@@ -120,6 +123,7 @@ async def execute_battle(
             winner, reason = _check_next_word(
                 last_next_word, last_valid_player,
                 current_player, history_words, used_words, reason,
+                validation_mode,
             )
             break
 
@@ -142,12 +146,13 @@ async def execute_battle(
             winner, reason = _check_next_word(
                 last_next_word, last_valid_player,
                 current_player, history_words, used_words, reason,
+                validation_mode,
             )
             break
 
         # 验证成语
         previous_word = history_words[-1] if history_words else start_word
-        valid, message = validate_idiom(response.word, previous_word, used_words)
+        valid, message = validate_idiom(response.word, previous_word, used_words, validation_mode)
 
         round_event = RoundEvent(
             round=round_num,
@@ -166,14 +171,15 @@ async def execute_battle(
         if not valid:
             if message == "成语不在词库中":
                 reason = f"{label}成语不在词库中"
-            elif message == "首字不匹配":
-                reason = f"{label}首字不匹配"
+            elif message in ("首字不匹配", "首字读音不匹配", "首字读音不匹配（多音字声调不同）"):
+                reason = f"{label}{message}"
             elif message == "成语已使用过":
                 reason = f"{label}成语重复使用"
             # 验证回合：检查上一位玩家的 next_word
             winner, reason = _check_next_word(
                 last_next_word, last_valid_player,
                 current_player, history_words, used_words, reason,
+                validation_mode,
             )
             break
 
@@ -219,6 +225,7 @@ async def run_battle(request: BattleRequest) -> AsyncGenerator[dict[str, str], N
         result = await execute_battle(
             request.model_a, request.model_b, request.start_word,
             on_round=on_round, system_prompt=request.system_prompt,
+            validation_mode=request.validation_mode,
         )
         return result
 

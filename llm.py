@@ -18,6 +18,11 @@ DEFAULT_SYSTEM_PROMPT = """\
 
 策略提示：选末字生僻的成语来增加对手难度，但你自己必须知道至少一个能接上的成语（填入next_word）。"""
 
+_MODE_HINTS = {
+    "homophone": "\n\n【本局接龙规则】下一个成语的首字读音（拼音）与上一个成语末字读音相同即可，不要求同一个字。",
+    "same_char_sound": "\n\n【本局接龙规则】下一个成语的首字必须与上一个成语末字相同，且读音也必须一致（注意多音字）。",
+}
+
 LLM_TIMEOUT = 60.0
 
 
@@ -26,6 +31,7 @@ def build_messages(
     player: str,
     start_word: str,
     system_prompt: str = "",
+    validation_mode: str = "same_char",
 ) -> list[dict[str, str]]:
     """构建当前模型视角的 messages 列表。
 
@@ -38,6 +44,8 @@ def build_messages(
       因此对 B 跳过 start_word，直接从 A 的第一步作为首条 user 消息。
     """
     prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
+    mode_hint = _MODE_HINTS.get(validation_mode, "")
+    prompt = prompt + mode_hint
 
     if player == "A":
         system_content = prompt
@@ -75,10 +83,11 @@ async def call_llm(
     player: str,
     start_word: str,
     system_prompt: str = "",
+    validation_mode: str = "same_char",
 ) -> LLMResponse:
     """调用 LLM 获取结构化输出。异常向上抛出由调用方处理。"""
     client = AsyncOpenAI(base_url=config.base_url, api_key=config.api_key)
-    messages = build_messages(history_words, player, start_word, system_prompt)
+    messages = build_messages(history_words, player, start_word, system_prompt, validation_mode)
     completion = await client.beta.chat.completions.parse(
         model=config.model,
         messages=messages,

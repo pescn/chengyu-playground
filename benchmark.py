@@ -26,6 +26,7 @@ async def _run_single_benchmark_battle(
     first_player: str,
     semaphore: asyncio.Semaphore,
     system_prompt: str = "",
+    validation_mode: str = "same_char",
 ) -> BenchmarkBattleResult:
     """运行单场 benchmark 对战。
 
@@ -36,12 +37,14 @@ async def _run_single_benchmark_battle(
         if first_player == "A":
             result = await execute_battle(
                 model_a, model_b, start_word, system_prompt=system_prompt,
+                validation_mode=validation_mode,
             )
             winner = result.winner
         else:
             # B 先手：交换模型位置
             result = await execute_battle(
                 model_b, model_a, start_word, system_prompt=system_prompt,
+                validation_mode=validation_mode,
             )
             # 反转 winner 映射（execute_battle 中 A 位置实际是 model_b）
             if result.winner == "A":
@@ -80,6 +83,7 @@ async def run_benchmark(
                 _run_single_benchmark_battle(
                     request.model_a, request.model_b, word, first, semaphore,
                     system_prompt=request.system_prompt,
+                    validation_mode=request.validation_mode,
                 )
             )
             tasks.append(task)
