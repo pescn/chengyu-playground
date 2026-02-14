@@ -69,9 +69,9 @@ docker run -p 8000:8000 -v chengyu-data:/app/data chengyu-playground
 `gen_dataset.py` 通过两个模型实时对战来收集训练样本。每步在调用 LLM **之前**将当前游戏状态构建为一条训练数据。LLM 的实际回复仅驱动游戏推进，不存入训练数据——veRL 训练时由 policy 自行生成回复，再由奖励函数打分。
 
 ```bash
-uv pip install pyarrow  # 额外依赖
+uv add pyarrow  # 额外依赖
 
-python gen_dataset.py \
+uv run gen_dataset.py \
     --base-url http://172.16.56.3:2998/v1 \
     --api-key sk-xxx \
     --model-a qwen3-max \
@@ -84,7 +84,7 @@ python gen_dataset.py \
 双方也可使用不同的 API 地址和 Key：
 
 ```bash
-python gen_dataset.py \
+uv run gen_dataset.py \
     --base-url-a http://host-a/v1 --api-key-a sk-aaa --model-a model-a \
     --base-url-b http://host-b/v1 --api-key-b sk-bbb --model-b model-b \
     --num-games 50
@@ -109,7 +109,7 @@ python gen_dataset.py \
 检查生成的数据：
 
 ```bash
-python -c "import pandas as pd; df=pd.read_parquet('dataset.parquet'); print(f'样本数: {len(df)}'); print(df.head())"
+uv run python -c "import pandas as pd; df=pd.read_parquet('dataset.parquet'); print(f'样本数: {len(df)}'); print(df.head())"
 ```
 
 ### 2. 数据集格式
@@ -165,19 +165,19 @@ python3 -m verl.trainer.main_ppo \
 
 ```bash
 # 第 1 轮：基座模型对战生成初始数据
-python gen_dataset.py \
+uv run gen_dataset.py \
     --base-url http://vllm-server:8000/v1 --api-key sk-xxx \
     --model-a base-model --model-b base-model \
     --num-games 200 --output round1.parquet
 
 # 第 1 轮 veRL GRPO 训练
-python3 -m verl.trainer.main_ppo \
+uv run python -m verl.trainer.main_ppo \
     data.train_files=round1.parquet \
     reward.custom_reward_function.path=reward_verl.py \
     reward.custom_reward_function.name=compute_score ...
 
 # 第 2 轮：部署训练后的模型，重新生成数据并训练
-python gen_dataset.py \
+uv run gen_dataset.py \
     --base-url http://vllm-server:8000/v1 --api-key sk-xxx \
     --model-a trained-r1 --model-b trained-r1 \
     --num-games 200 --output round2.parquet

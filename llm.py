@@ -1,4 +1,7 @@
+from typing import cast
+
 from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from models import LLMResponse, ModelConfig
 
@@ -90,7 +93,7 @@ async def call_llm(
     messages = build_messages(history_words, player, start_word, system_prompt, validation_mode)
     completion = await client.beta.chat.completions.parse(
         model=config.model,
-        messages=messages,
+        messages=cast(list[ChatCompletionMessageParam], messages),
         response_format=LLMResponse,
         timeout=LLM_TIMEOUT,
     )

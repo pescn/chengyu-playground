@@ -12,4 +12,5 @@ dependencies = [
     "sse-starlette>=2.0.0",
     "tortoise-orm>=0.22.0",
     "aiosqlite>=0.20.0",
+    "pyarrow>=23.0.0",
 ]
